@@ -1,0 +1,41 @@
+# Secrets / config
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Rust / native (when added)
+target/
+*.so
+*.dll
+*.dylib
+
+# Data / models / runtime state (do NOT commit memory or model weights)
+data/
+models/
+*.sqlite
+*.sqlite3
+*.db
+*.duckdb
+logs/
+*.log
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
