@@ -29,6 +29,6 @@ Storage: relational node/edge tables in Postgres + `pgvector` for similarity. De
 - Supports absent people, multi-account, and same-name disambiguation natively.
 - Resolution is never assumed final — it's revisited as evidence accrues ("always improving").
 
-## Constraint
+## Consent posture
 
-Modeling *other* people is sensitive. Default posture: deep profiling scoped to the operator; modeling of others limited and deliberate. Revisit before any surface exposes others' profiles.
+The operator asserts that all participants in their Discord server(s) have **consented** to being modeled. Under that assertion, full participant modeling (entities, accounts, beliefs, relationships) is **permitted** within the operator's servers. This is the operator's stated basis; if Kaizen is ever pointed at a space where that assumption doesn't hold, revisit before profiling.

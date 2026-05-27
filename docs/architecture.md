@@ -75,14 +75,33 @@ See [ADR 0006](decisions/0006-model-strategy-and-setup.md).
 - **Graceful degradation:** works even with no paid subscription — falls back to a local model. Always works.
 - **One-time consent setup:** with a single yes, Kaizen detects hardware, picks an appropriate model size, installs the runtime (Ollama), pulls the model, and wires it up. No manual `.env` surgery; manual override available.
 
+## Tools, world-awareness & Hermes integration
+
+**Tools** ([ADR 0009](decisions/0009-tooling-and-skills.md)): web search, YouTube transcripts, financial data (OpenBB), and document RAG. All I/O-bound, so implemented in Python; the pattern is cheap/free fetch → local model digests/embeds → frontier reasons only when needed. Tools plug into a core-defined tool/skill interface.
+
+**World-awareness** ([ADR 0011](decisions/0011-world-awareness-and-initiation.md)): a background world/news/market feed, a local relevance model scoring items against the operator's positions/projects/people, a temporal model tracking upcoming dated events, and a high-bar proactive-initiation policy that can break silence when something important crosses the bar.
+
+**Hermes integration** ([ADR 0010](decisions/0010-hermes-integration.md)): observability over Hermes telemetry, decision journaling, a plain-language RiskAdvisory voice, and an adversarial analyst that challenges trade theses and surfaces qualitative/event factors the quant model is blind to — all behind a **hard execution wall** (Kaizen never executes trades, moves money, or influences the validation gate).
+
 ## Deployment
 
-- **Hetzner VPS** hosts the always-on core + Discord gateway + Postgres + Redis.
-- **GPU placement (open decision):** local models need a GPU; a cheap Hetzner VPS has none. Options:
-  1. Hetzner **GPU** instance (simplest, pricier).
-  2. Core/gateway on a cheap Hetzner box; **local inference on a home GPU machine** reached over a private network (Tailscale/Twingate). Usually the sweet spot.
-  3. Run everything on an always-on home box.
+Resolved topology (see [ADR 0007](decisions/0007-compute-topology.md)): **always-on core + on-demand GPU worker + cloud floor.**
+
+- **Core (always-on):** a small Hetzner Cloud instance with no GPU (CPX21/CX32 class, ~4–8GB RAM) hosts the loop, router, Postgres + pgvector + Redis, and the Discord gateway. The core is I/O-bound, so this is plenty.
+- **Home GPU worker (on-demand):** the operator's desktop (RTX 3080, i9-13900k, 64GB) is a Tier-0 inference worker — local 7–8B 4-bit models, embeddings, triage, scribe. It is *not* always on and is never a dependency.
+- **Networking:** Tailscale (WireGuard mesh) privately connects the VPS to the home worker.
+- **Wake-on-LAN:** the core wakes the sleeping desktop via an always-on home-LAN **wake relay** (router or Raspberry Pi) reached over Tailscale; the worker auto-starts and registers on wake.
+- **Latency hiding / fallback:** if the worker is asleep/unreachable/waking, respond immediately via cloud and queue heavy local-eligible jobs for when it's up.
+- **Routing tiers:** Tier 0 local (free, high-volume) → Tier 1 cheap cloud → Tier 2 frontier (Opus, rare/hard). The router picks by difficulty/stakes (ADR 0005).
+- **Worker pool:** any machine running a worker can join; the router distributes *jobs*, not a single model's layers.
 - Terminal surface runs anywhere and connects back to the core.
+- No hardware purchase required to start; a dedicated home server is a later option if usage justifies it.
+
+## Cost & scale
+
+**Cost:** the local-first funnel keeps the bulk near-free; tiered routing reserves frontier models for rare hard tasks. Disciplined run-rate ~$55–120/mo. The Max subscription is separate from the metered API. See [ADR 0008](decisions/0008-cost-and-billing.md).
+
+**Scale:** a years-old, millions-of-message, ~10-person Discord is handled by a one-time local **backfill** → `pgvector` RAG + tiered summaries — history is an indexing problem, not a context-window problem. Multi-party interjection is the main hard problem. See [ADR 0012](decisions/0012-scale-backfill-multiparty.md).
 
 ## Repo organization
 
@@ -104,7 +123,7 @@ kaizen/
 ├── docs/
 │   ├── architecture.md
 │   ├── design-log.md
-│   ├── roadmap.md
+│   ├── design-plan.md
 │   ├── decisions/           # ADRs
 │   └── research/            # upstream evaluation, notes
 └── tests/

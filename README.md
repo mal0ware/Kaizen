@@ -24,7 +24,7 @@ A personal, always-on, self-improving AI agent. One mind, many surfaces.
 - [Architecture](docs/architecture.md) — the consolidated system design
 - [Design log](docs/design-log.md) — every decision, what changed, and why
 - [Decisions (ADRs)](docs/decisions/) — settled choices, one per file
-- [Roadmap](docs/roadmap.md) — MVP → self-design
+- [Design plan](docs/design-plan.md) — every component, its method, and how they fit together
 - [Upstream evaluation](docs/research/upstream-evaluation.md) — the harnesses studied as reference
 
 ## Vision

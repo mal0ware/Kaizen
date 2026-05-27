@@ -19,6 +19,8 @@ Per-message pipeline:
 
 A **social governor** wraps interjection: don't interrupt a live human-to-human exchange, respect cooldowns, rate-limit self-interjections, back off when ignored, expose a "talkativeness" dial.
 
+**Interjection governor (pre-send re-check).** Triage runs fast, so Kaizen can *draft* an intervention that makes sense. But conversations move fast — by the time a draft is ready, the thread may have moved on. So in an **active conversation**, immediately before sending, Kaizen **re-validates the draft against the latest messages**: if it still makes sense and contributes meaningfully, send; if the conversation has moved past it, drop or revise. The bar is "does this still meaningfully contribute *right now*," checked at send-time, not just at draft-time. This is what keeps contributions timely and on-point in a fast multi-party channel.
+
 ## Consequences
 
 - This is the local/cloud orchestration applied to **latency and depth** — cheap triage on everything, expensive deliberation only when warranted.

@@ -61,6 +61,32 @@ A chronological record of design decisions: what was discussed, what was decided
 - **Hetzner** chosen as the VPS. Reuse Vixen's stack (Python, `discord.py`, Postgres, Redis).
 - **Open decision:** local models need a GPU that a cheap Hetzner VPS lacks. Options recorded in [architecture.md#deployment](architecture.md#deployment); leaning toward core-on-Hetzner + local inference on a home GPU box over Tailscale/Twingate. **To be settled before the MVP build.**
 
+## 2026-05-26 — Compute topology resolved (ADR 0007)
+
+- Settled the GPU question left open above. **Decision:** always-on core on a cheap (no-GPU) Hetzner box + the operator's home desktop (RTX 3080 / i9-13900k / 64GB) as an **on-demand GPU worker** + cloud as both the always-available floor and the heavy (Tier-2/Opus) thinker.
+- **Tailscale** (WireGuard mesh) links VPS ↔ home worker privately. **Wake-on-LAN** via an always-on home-LAN relay (router/Pi) wakes the desktop on demand; cloud-first response + queued local jobs hide wake latency.
+- Model routing tiers: Tier 0 local (free, high-volume) / Tier 1 cheap cloud / Tier 2 frontier (rare, hard). Worker pool distributes *jobs*, not a single model's layers.
+- **No hardware purchase required** to start; dedicated home server deferred until usage justifies. VPS not yet purchased.
+
+## 2026-05-26 — Worker hardware & relay confirmed
+
+- Home worker confirmed: `MAL0SS` — RTX 3080 **10GB** (device ID `DEV_2216`), i9-13900K, 64GB, Win 11 Pro / MSI Z790 Tomahawk. Local sweet spot = 7–8B 4-bit for Tier-0.
+- Wake relay decided: **Raspberry Pi** (router WoL unconfirmed). Flipper Zero considered and rejected — it's an RF/NFC multitool, not an always-on networked relay.
+
+## 2026-05-26 — Viability, tooling, integration & scale (ADRs 0008–0013)
+
+- **Cost/billing (ADR 0008):** Max ($200) is separate from metered API. Strategy: local-first funnel (~$0.50/M electricity) for the bulk; Max-via-Claude-Code for the operator's personal lane; metered API only for autonomous/multi-user traffic (don't route the public bot through the personal sub — ToS + rate limits). Disciplined run-rate ~$55–120/mo; Opus is the swing.
+- **Tools (ADR 0009):** web search, YouTube transcripts, financial (OpenBB), doc RAG — all **Python** (I/O-bound; C++ buys nothing and OpenBB is Python). Clean-reimpl from upstream patterns, built against a core tool interface *after* the skeleton — not standalone now. Pushed back on writing tools in C++ now as premature + misapplied.
+- **Hermes integration (ADR 0010):** observability + journaling + RiskAdvisory voice + **adversarial analyst** (challenge theses, surface blind spots) + alerting. HARD WALL: never executes, moves money, or touches the validation gate. Advisor, not oracle.
+- **World-awareness (ADR 0011):** world feed + relevance model + temporal model + high-bar proactive initiation (can break silence on important events).
+- **Scale (ADR 0012):** millions of messages = one-time local backfill → pgvector RAG + tiered summaries (an indexing problem, not a context problem). Multi-party (~10 talkers) is the hard ML/UX part. **Consent:** operator asserts all participants consented → full participant modeling permitted.
+- **Hardware (ADR 0013):** Hetzner CPX41 (16GB, Ashburn) core; Pi 5 wake relay. Pis are non-modular SoCs; a growable home node would be a mini-PC/SFF build, not a Pi.
+- **Interjection governor (ADR 0005 update):** draft → re-check relevance against the latest messages right before sending → send only if it still meaningfully contributes.
+
+## 2026-05-26 — Roadmap replaced with a non-phased design plan
+
+- Operator preference: **no phased / numbered / staged roadmaps.** Reason: execution is driven via Claude Code, which branches off completed tasks rather than following a linear plan, so phased roadmaps are wasted effort. Replaced `roadmap.md` with [design-plan.md](design-plan.md) — a component-by-component plan (purpose / method / structure / connections / expected) plus end-to-end data-flow, with no implied order.
+
 ## 2026-05-26 — North star: self-design
 
-- Once the MVP is up (Hetzner + local models + core + Discord + terminal), point Kaizen at its own design problems, using these docs as its working substrate, so it helps design itself — gated proposals only. Captured in [roadmap.md](roadmap.md).
+- Once Hetzner + local models + core + Discord + terminal are up, point Kaizen at its own design problems, using these docs as its working substrate, so it helps design itself — gated proposals only. Detailed in [design-plan.md](design-plan.md).
