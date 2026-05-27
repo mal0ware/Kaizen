@@ -87,6 +87,13 @@ A chronological record of design decisions: what was discussed, what was decided
 
 - Operator preference: **no phased / numbered / staged roadmaps.** Reason: execution is driven via Claude Code, which branches off completed tasks rather than following a linear plan, so phased roadmaps are wasted effort. Replaced `roadmap.md` with [design-plan.md](design-plan.md) — a component-by-component plan (purpose / method / structure / connections / expected) plus end-to-end data-flow, with no implied order.
 
+## 2026-05-26 — First real provider + tool (implementation)
+
+- Implemented the **API-key Anthropic provider** (real message/tool mapping with tool_use/tool_result matched by id, plus optional extended thinking) and a **Claude Code provider** that shells out to the `claude` CLI so usage draws on the $200 Max plan (text-only personal lane; metered API is the fallback and the structured-tool-use path). A `build_router` factory wires the billing strategy (ADR 0008).
+- Core change for real tool loops: added `ToolCall.id` and `Message.tool_call_id`; the loop now records the assistant tool-use turn before tool results (real providers require it).
+- Added tool **run-location** + `TransientToolError`, and the **YouTube transcript tool** built around the ytmerge failures: `RESIDENTIAL` routing, block-vs-no-captions classification (by exception type name), a swappable fetcher, and caching (ADR 0009).
+- Verified pure logic with unit tests; live API/CLI/YouTube paths need keys / a residential IP and were not run here.
+
 ## 2026-05-26 — North star: self-design
 
 - Once Hetzner + local models + core + Discord + terminal are up, point Kaizen at its own design problems, using these docs as its working substrate, so it helps design itself — gated proposals only. Detailed in [design-plan.md](design-plan.md).

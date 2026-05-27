@@ -20,6 +20,14 @@ Kaizen needs to search the web, pull YouTube transcripts, fetch financial data, 
 - **Sequencing:** tools plug into a tool/skill interface defined by the core. That interface (and the package skeleton) come **first**; tools are written against it — not implemented standalone in an empty repo.
 - **Only native candidate:** the high-volume embedding/ingest batch path (CPU/GPU-heavy), and only after profiling — never the fetch tools.
 
+## Robustness (lessons from the ytmerge project)
+
+The prior `ytmerge` tool failed in two instructive ways, now designed out:
+
+- **Datacenter IPs get blocked by YouTube.** Tools declare a `RunLocation`; the YouTube tool is `RESIDENTIAL`, so the orchestrator runs it on the home worker, never the cloud VPS — the same residential-vs-datacenter logic as the GPU worker (ADR 0007).
+- **Never conflate "blocked" with "empty."** A `TransientToolError` (rate-limit / IP block / timeout) is distinct from a genuine no-result and from a real bug. Tools classify errors — by exception *type name*, to survive library version churn — and the orchestrator retries/reroutes transient failures instead of reporting them as "no data." (ytmerge silently reported IP blocks as "no captions.")
+- **Isolate brittle dependencies.** `youtube-transcript-api` (which broke 0.x→1.x) sits behind one swappable fetch function; results are cached to avoid re-hitting the source.
+
 ## Consequences
 
 - Fast to build, ecosystem-rich, cheap to run.

@@ -14,12 +14,22 @@ class Settings(BaseSettings):
     # Models / providers
     anthropic_api_key: str | None = None
     use_claude_code_auth: bool = False
+    use_local_model: bool = False  # when True, the LOCAL tier uses Ollama instead of the mock
     local_model_endpoint: str = "http://localhost:11434"  # Ollama default
     frontier_model: str = "claude-opus-4"
     cheap_model: str = "claude-haiku-4"
     local_model: str = "qwen2.5:7b"
 
-    # Infra (filled in once Hetzner / Postgres / Redis exist)
+    # Memory
+    embed_model: str = "nomic-embed-text"  # Ollama embedding model (768-dim)
+    vector_dim: int = 768
+    enable_scribe: bool = True  # ambient learning: extract + store facts after each exchange
+
+    # Surfaces
+    discord_token: str | None = None
+    active_window_seconds: int = 180  # after you address it, keep replying for this long
+
+    # Infra (empty = use in-memory store; set to use self-hosted/managed Postgres)
     database_url: str | None = None
     redis_url: str | None = None
 

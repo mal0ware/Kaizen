@@ -29,6 +29,7 @@ class Role(str, Enum):
 class ToolCall:
     name: str
     arguments: dict = field(default_factory=dict)
+    id: str = field(default_factory=_uid)  # ties a tool result back to its request
 
 
 @dataclass(slots=True)
@@ -38,6 +39,7 @@ class Message:
     author_id: str | None = None  # stable platform id (e.g., Discord snowflake)
     name: str | None = None  # display name, or tool name for TOOL messages
     tool_calls: list[ToolCall] = field(default_factory=list)
+    tool_call_id: str | None = None  # on a TOOL message: which ToolCall it answers
     created_at: datetime = field(default_factory=_now)
 
 

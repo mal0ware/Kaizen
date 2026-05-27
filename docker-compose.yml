@@ -1,0 +1,24 @@
+# Kaizen data layer — self-hosted Postgres (with pgvector) + Redis.
+# Dev: `docker compose up -d` on your machine. Prod: the same file on the Hetzner box.
+# Kaizen connects via DATABASE_URL / REDIS_URL (see .env.example).
+services:
+  postgres:
+    image: pgvector/pgvector:pg16   # Postgres 16 with the pgvector extension preinstalled
+    environment:
+      POSTGRES_USER: kaizen
+      POSTGRES_PASSWORD: kaizen
+      POSTGRES_DB: kaizen
+    ports:
+      - "5432:5432"
+    volumes:
+      - kaizen_pgdata:/var/lib/postgresql/data   # data persists across restarts
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+volumes:
+  kaizen_pgdata:
