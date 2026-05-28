@@ -1,0 +1,149 @@
+# Box A — consolidated production stack.
+#
+# Box A is the always-on home for the bots + Kaizen core. It runs on
+# the cheapest sensible Droplet (DigitalOcean Basic 2 GB, NYC region,
+# Ubuntu 24.04) and is fully funded for a year by the GitHub Student
+# Developer Pack DigitalOcean credit ($200 / 12 months).
+#
+# Repo layout (the compose expects all three cloned as siblings):
+#
+#   /opt/box-a/
+#     Kaizen/   <- this repo, contains this compose under deploy/
+#     Vixen/    <- sibling clone, used by `build:` below
+#
+# First-time bring-up:
+#
+#   cd /opt/box-a/Kaizen/deploy
+#   cp .env.example .env  &&  $EDITOR .env
+#   docker compose -f docker-compose.box-a.yml up -d --build
+#
+# Operational reference: deploy/runbook.md.
+
+name: box-a
+
+networks:
+  box-a-net:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+
+services:
+  # ---------------------------------------------------------------------------
+  # Data plane — one Postgres (with pgvector) holding per-project databases,
+  # one Redis using DB-index isolation per consumer.
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: box-a-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_SUPERUSER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?set POSTGRES_SUPERUSER_PASSWORD in .env}
+      # Per-project credentials are forwarded to the init script.
+      KAIZEN_DB_USER: ${KAIZEN_DB_USER:-kaizen}
+      KAIZEN_DB_PASSWORD: ${KAIZEN_DB_PASSWORD:?set KAIZEN_DB_PASSWORD in .env}
+      VIXEN_DB_USER: ${VIXEN_DB_USER:-vixen}
+      VIXEN_DB_PASSWORD: ${VIXEN_DB_PASSWORD:?set VIXEN_DB_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres-init.sh:/docker-entrypoint-initdb.d/00-init.sh:ro
+    networks:
+      - box-a-net
+    # Loopback-only on the host — Tailscale handles remote admin access.
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_SUPERUSER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:7-alpine
+    container_name: box-a-redis
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --save
+      - "60 1000"
+    volumes:
+      - redis-data:/data
+    networks:
+      - box-a-net
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # Apps — Kaizen core (always-on agent) and Vixen (Discord bot).
+  # Each gets its own Postgres DB and its own Redis DB-index.
+  # ---------------------------------------------------------------------------
+  kaizen:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: box-a-kaizen
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Overrides .env values so the in-network hostnames win.
+      KAIZEN_DATABASE_URL: postgresql+asyncpg://${KAIZEN_DB_USER:-kaizen}:${KAIZEN_DB_PASSWORD}@postgres:5432/kaizen
+      KAIZEN_REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - box-a-net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  vixen:
+    build:
+      context: ../../Vixen
+      dockerfile: Dockerfile
+    container_name: box-a-vixen
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Vixen reads unprefixed DATABASE_URL / REDIS_URL.
+      DATABASE_URL: postgresql+asyncpg://${VIXEN_DB_USER:-vixen}:${VIXEN_DB_PASSWORD}@postgres:5432/vixen
+      REDIS_URL: redis://redis:6379/1
+      ENV: prod
+      LOG_LEVEL: INFO
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - box-a-net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
