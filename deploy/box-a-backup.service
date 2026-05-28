@@ -1,0 +1,21 @@
+# Box A — nightly backup unit, invoked by box-a-backup.timer.
+#
+# Install:
+#   sudo cp deploy/box-a-backup.service /etc/systemd/system/
+#   sudo cp deploy/box-a-backup.timer   /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now box-a-backup.timer
+
+[Unit]
+Description=Box A nightly backup (Postgres dumps + Redis AOF -> restic)
+After=box-a.service
+Requires=box-a.service
+
+[Service]
+Type=oneshot
+User=operator
+Group=docker
+WorkingDirectory=/opt/box-a/Kaizen/deploy
+ExecStart=/usr/bin/bash /opt/box-a/Kaizen/deploy/backup.sh
+# Don't let a stuck backup block the system; retry tomorrow.
+TimeoutStartSec=900

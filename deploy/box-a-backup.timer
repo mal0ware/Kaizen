@@ -1,0 +1,13 @@
+# Box A — schedule for nightly backups. Fires at 03:30 local time,
+# well after the unattended-upgrades reboot window (04:00).
+
+[Unit]
+Description=Run Box A nightly backup at 03:30
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,34 @@
+# Box A — systemd unit that auto-starts the compose stack on boot.
+#
+# Install (run as the operator user):
+#   sudo cp deploy/box-a.service /etc/systemd/system/box-a.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now box-a.service
+#
+# Logs:
+#   journalctl -u box-a.service -f
+#
+# Stop / restart the whole stack:
+#   sudo systemctl stop box-a.service
+#   sudo systemctl restart box-a.service
+
+[Unit]
+Description=Box A compose stack (Kaizen core + Vixen + shared Postgres/Redis)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=operator
+Group=docker
+WorkingDirectory=/opt/box-a/Kaizen/deploy
+# `up -d` is the start; the compose-managed containers run independently
+# under dockerd, so the unit itself is one-shot.
+ExecStart=/usr/bin/docker compose -f docker-compose.box-a.yml up -d --remove-orphans
+ExecStop=/usr/bin/docker compose -f docker-compose.box-a.yml down
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target
