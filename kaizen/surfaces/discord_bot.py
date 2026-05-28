@@ -1,17 +1,25 @@
 """Discord surface — a thin client that connects Discord to the Kaizen engine.
 
-Run with: `python -m kaizen.surfaces.discord_bot` (needs KAIZEN_DISCORD_TOKEN).
+Run with: ``python -m kaizen.surfaces.discord_bot`` (needs KAIZEN_DISCORD_TOKEN).
 
-Reuses the same engine wiring as the CLI (providers + memory + scribe), keeps
-one Session per channel, and carries the Discord user id (snowflake) as author_id
-(the identity anchor, ADR 0003).
+Reuses the same engine wiring as the CLI (``build_agent`` returns an
+:class:`AgentBundle` with the loop, gate, queue, skills, and learned traits),
+keeps one Session per channel, and carries the Discord user id (snowflake) as
+``author_id`` (the identity anchor, ADR 0003).
 
 Triggering (v1.5 — a step toward the interjection governor, ADR 0005):
   - DMs: always.
-  - Servers: when @mentioned, when you reply to one of its messages, or while a
-    short per-user "active conversation" window is open (ping once, then talk).
+  - Servers: when @mentioned, when you reply to one of its messages, or while
+    a short per-user "active conversation" window is open (ping once, then talk).
 
-`discord.py` is an optional dep (`pip install discord.py`).
+Operator-only commands (DM the bot):
+    !proposals          list pending curator proposals
+    !approve <id>       approve a proposal (id prefix is fine)
+    !reject  <id>       reject a proposal
+    !traits             show learned-voice traits
+    !skills             show active skills
+
+``discord.py`` is an optional dep (``pip install discord.py``).
 """
 from __future__ import annotations
 
@@ -19,34 +27,57 @@ import time
 
 import discord
 
+from kaizen.cli.main import build_agent
 from kaizen.config import load_settings
-from kaizen.core.context import ContextEngine
-from kaizen.core.loop import AgentLoop
 from kaizen.core.models import Message, Role, Session
-from kaizen.memory.factory import build_memory
-from kaizen.memory.inmemory import InMemoryStore
-from kaizen.memory.scribe import Scribe
-from kaizen.providers.base import Tier
-from kaizen.providers.factory import build_router
-from kaizen.providers.mock import MockProvider
-from kaizen.tools.base import ToolRegistry
-from kaizen.tools.builtin import CurrentTimeTool, EchoTool
-
-
-def _build_loop(settings):
-    memory = build_memory(settings, InMemoryStore())
-    tools = ToolRegistry()
-    tools.register(CurrentTimeTool())
-    tools.register(EchoTool())
-    router = build_router(settings, MockProvider())
-    scribe = Scribe(router.providers[Tier.LOCAL], memory) if settings.enable_scribe else None
-    context = ContextEngine(memory, system_prompt=settings.system_prompt)
-    return AgentLoop(router, context, tools, scribe=scribe), memory
+from kaizen.curator.apply import apply_approval
 
 
 def _chunks(text: str, limit: int = 1900) -> list[str]:
     text = text or "(no response)"
     return [text[i : i + limit] for i in range(0, len(text), limit)]
+
+
+def _format_proposals(bundle) -> str:
+    pending = bundle.queue.pending()
+    if not pending:
+        return "(no pending proposals)"
+    lines = []
+    for p in pending:
+        payload = getattr(p.payload, "action", None) or getattr(p.payload, "name", "")
+        lines.append(
+            f"`{p.id[:8]}` **{p.kind}** conf={p.confidence:.2f} — {payload}\n"
+            f"    _why:_ {p.rationale}"
+        )
+    return "\n".join(lines)
+
+
+def _handle_dm_command(content: str, bundle) -> str | None:
+    """Return a reply string if ``content`` is a recognized command, else None."""
+    cmd, _, arg = content.strip().partition(" ")
+    if cmd == "!proposals":
+        return _format_proposals(bundle)
+    if cmd in {"!approve", "!reject"}:
+        if not arg.strip():
+            return f"usage: `{cmd} <id-prefix>`"
+        match = next(
+            (p for p in bundle.queue.pending() if p.id.startswith(arg.strip())),
+            None,
+        )
+        if match is None:
+            return f"no pending proposal matches `{arg.strip()}`"
+        if cmd == "!approve":
+            bundle.queue.approve(match.id)
+            return apply_approval(match, bundle.learned_traits, bundle.skills)
+        bundle.queue.reject(match.id)
+        return f"rejected `{match.id[:8]}`"
+    if cmd == "!traits":
+        if not bundle.learned_traits:
+            return "(no learned traits yet — approve an instinct to add one)"
+        return "\n".join(f"- {t}" for t in bundle.learned_traits)
+    if cmd == "!skills":
+        return "\n".join(f"- **{s['name']}**: {s['description']}" for s in bundle.skills.specs())
+    return None
 
 
 def run() -> None:
@@ -57,7 +88,7 @@ def run() -> None:
             "(Discord Developer Portal -> your app -> Bot -> Token)."
         )
 
-    agent, memory = _build_loop(settings)
+    bundle = build_agent(settings)
     sessions: dict[int, Session] = {}
     active: dict[tuple[int, int], float] = {}  # (channel_id, user_id) -> window expiry
 
@@ -72,6 +103,7 @@ def run() -> None:
 
     @client.event
     async def on_ready():
+        memory = bundle.loop.context.memory
         init = getattr(memory, "init_db", None)
         if init is not None:
             await init()
@@ -101,10 +133,18 @@ def run() -> None:
         if not content:
             return
 
+        # Operator commands are DM-only — keeps gate access scoped to private chat.
+        if is_dm and content.startswith("!"):
+            reply_text = _handle_dm_command(content, bundle)
+            if reply_text is not None:
+                for chunk in _chunks(reply_text):
+                    await message.channel.send(chunk)
+                return
+
         session = sessions.setdefault(message.channel.id, Session(surface="discord"))
         try:
             async with message.channel.typing():
-                reply = await agent.handle(
+                reply = await bundle.loop.handle(
                     session,
                     Message(
                         role=Role.USER,

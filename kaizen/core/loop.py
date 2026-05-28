@@ -1,7 +1,8 @@
 """The agent loop: assemble context -> route -> complete -> run tools -> repeat.
 
-After producing a reply it kicks off the scribe (if configured) as a background
-task, so ambient learning never adds latency to the response.
+After producing a reply it kicks off the scribe and the curator (if configured)
+as background tasks, so ambient learning and persona-evolution proposals never
+add latency to the response.
 """
 from __future__ import annotations
 
@@ -21,12 +22,16 @@ class AgentLoop:
         context: ContextEngine,
         tools: ToolRegistry,
         scribe=None,
+        curator=None,
+        proposal_queue=None,
         max_tool_rounds: int = 3,
     ):
         self.router = router
         self.context = context
         self.tools = tools
         self.scribe = scribe
+        self.curator = curator
+        self.proposal_queue = proposal_queue
         self.max_tool_rounds = max_tool_rounds
 
     def _maybe_scribe(self, session: Session) -> None:
@@ -36,6 +41,24 @@ class AgentLoop:
             asyncio.create_task(self.scribe.observe(session))
         except RuntimeError:
             pass  # no running event loop (e.g. called synchronously) — skip
+
+    def _maybe_curate(self, session: Session) -> None:
+        if self.curator is None or self.proposal_queue is None:
+            return
+        try:
+            asyncio.create_task(self._curate(session))
+        except RuntimeError:
+            pass
+
+    async def _curate(self, session: Session) -> None:
+        """Run the curator and push proposals into the queue. Swallows errors —
+        a failed curation pass must never break the conversation."""
+        try:
+            proposals = await self.curator.review(session)
+            for proposal in proposals:
+                self.proposal_queue.add(proposal)
+        except Exception:
+            return
 
     async def handle(self, session: Session, user_message: Message) -> Message:
         session.add(user_message)
@@ -76,10 +99,12 @@ class AgentLoop:
                 Message(role=Role.ASSISTANT, content=response.text, name=provider.name)
             )
             self._maybe_scribe(session)
+            self._maybe_curate(session)
             return assistant
 
         assistant = session.add(
             Message(role=Role.ASSISTANT, content="(stopped: tool-round limit)", name=provider.name)
         )
         self._maybe_scribe(session)
+        self._maybe_curate(session)
         return assistant
