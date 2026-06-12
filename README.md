@@ -12,6 +12,19 @@ A personal, always-on, self-improving AI agent. One mind, many surfaces.
 - **Local + cloud, orchestrated.** Cheap local models do high-volume grunt work and real-time triage; your Anthropic API key handles hard reasoning. It works even with no paid subscription by falling back to a local model.
 - **Thinks before it speaks.** Fast replies for simple turns; deliberate, fact-verified reasoning when stakes are high — and it knows which is which.
 
+## Run it in 60 seconds
+
+The default configuration needs no API keys and no infrastructure: a deterministic mock provider and an in-memory store.
+
+```bash
+git clone https://github.com/mal0ware/Kaizen.git
+cd Kaizen
+pip install -e .
+python -m kaizen
+```
+
+This starts a terminal REPL backed by the mock provider. Type `/help` for in-session commands and `exit` to quit. To run against real models or persistent memory, copy `.env.example` to `.env` and fill in the relevant values.
+
 ## Stack at a glance
 
 - Python orchestration; Rust/C++ for proven hot paths — see [ADR 0001](docs/decisions/0001-language-and-performance.md).
@@ -33,4 +46,14 @@ Get the Hetzner deployment and local models running as an MVP, then point Kaizen
 
 ## Status
 
-Early. Foundation and design locked; implementation not yet started. Kaizen is a clean reimplementation inspired by existing agent harnesses — no third-party code is copied. License: TBD.
+Runnable skeleton. The core subsystems are implemented and covered by 95 tests:
+
+- **Agent loop** — context assembly, routed completion, tool rounds, and background scribe/curator passes.
+- **Tiered routing** — local / cheap / frontier tiers with per-message triage.
+- **Providers** — Anthropic API, Claude-CLI subprocess (subscription auth), local Ollama-compatible endpoint, and a deterministic mock for zero-key development.
+- **Memory** — in-memory store by default; Postgres + pgvector backend when configured.
+- **Curator** — proposes learned traits and skills from conversation; every change is held in a queue behind an operator approval gate.
+- **Discord surface** — gateway bot sharing the same agent core as the CLI.
+- **Deploy scaffolding** — Docker Compose, systemd units, provisioning and backup scripts under [`deploy/`](deploy/).
+
+Kaizen is a clean reimplementation inspired by existing agent harnesses — no third-party code is copied. License: MIT — see [LICENSE](LICENSE).

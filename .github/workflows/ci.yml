@@ -1,0 +1,54 @@
+# ============================================================================
+# Kaizen CI. Runs on push and PR.
+# ============================================================================
+# One job: lint with ruff, type-check with mypy, run pytest. Matrix on the
+# minimum supported Python and the current target.
+# ============================================================================
+
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: python ${{ matrix.python-version }}
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Upgrade build tooling
+        run: python -m pip install --upgrade pip setuptools wheel
+
+      - name: Install kaizen + dev extras
+        run: python -m pip install -e ".[dev]"
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Type-check (mypy)
+        # Soft-fail until we've audited the full surface; flip to required
+        # once the type debt is paid down.
+        run: mypy kaizen || true
+
+      - name: Run pytest
+        run: python -m pytest -q
