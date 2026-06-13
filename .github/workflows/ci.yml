@@ -46,9 +46,9 @@ jobs:
         run: ruff check .
 
       - name: Type-check (mypy)
-        # Soft-fail until we've audited the full surface; flip to required
-        # once the type debt is paid down.
-        run: mypy kaizen || true
+        # Hard gate. The kaizen package is fully annotated and checked under a
+        # strict config (see [tool.mypy] in pyproject.toml); a regression fails CI.
+        run: mypy
 
       - name: Run pytest
         run: python -m pytest -q

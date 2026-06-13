@@ -12,6 +12,59 @@ A personal, always-on, self-improving AI agent. One mind, many surfaces.
 - **Local + cloud, orchestrated.** Cheap local models do high-volume grunt work and real-time triage; your Anthropic API key handles hard reasoning. It works even with no paid subscription by falling back to a local model.
 - **Thinks before it speaks.** Fast replies for simple turns; deliberate, fact-verified reasoning when stakes are high — and it knows which is which.
 
+## Architecture at a glance
+
+Surfaces are thin clients of one headless core. The core triages each message, routes it to a tier, runs tool rounds, then learns from the exchange in the background — with every self-state change held behind an operator approval gate.
+
+```mermaid
+flowchart TB
+    subgraph surfaces["Surfaces (thin clients)"]
+        cli["Terminal CLI"]
+        discord["Discord gateway"]
+        web["Web pane (later)"]
+    end
+
+    subgraph core["Headless core"]
+        loop["Agent loop<br/>context → route → complete → tools"]
+        triage["Triage<br/>(eval-graded heuristic)"]
+        router["Router"]
+        context["Context engine<br/>persona + tone + recall"]
+        gate{{"Approval gate<br/>(self-state changes only)"}}
+    end
+
+    subgraph tiers["Provider tiers"]
+        local["LOCAL · Ollama / mock"]
+        cheap["CHEAP · Anthropic API"]
+        frontier["FRONTIER · API / Claude Code sub"]
+    end
+
+    subgraph learn["Background learning"]
+        scribe["Scribe<br/>(ambient fact extraction)"]
+        curator["Curator<br/>(instinct / skill proposals)"]
+    end
+
+    subgraph memory["Memory + identity"]
+        store[("MemoryStore<br/>in-memory · Postgres/pgvector")]
+        identity[("Identity graph<br/>entity · account · belief")]
+    end
+
+    cli --> loop
+    discord --> loop
+    web -.-> loop
+
+    loop --> triage --> router
+    router --> local
+    router --> cheap
+    router --> frontier
+    loop --> context --> store
+
+    loop -.async.-> scribe --> store
+    loop -.async.-> curator -->|proposal| gate
+    gate -->|approved| context
+    gate -->|approved| loop
+    discord -.author_id.-> identity
+```
+
 ## Run it in 60 seconds
 
 The default configuration needs no API keys and no infrastructure: a deterministic mock provider and an in-memory store.

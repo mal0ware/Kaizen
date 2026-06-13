@@ -6,6 +6,7 @@ the same protocol and live alongside these (ADR 0009).
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Any
 
 from kaizen.tools.base import RunLocation
 
@@ -15,7 +16,7 @@ class CurrentTimeTool:
     description = "Return the current UTC time as an ISO-8601 string."
     run_location = RunLocation.ANY
 
-    async def run(self, **kwargs) -> str:
+    async def run(self, **kwargs: Any) -> str:
         return datetime.now(timezone.utc).isoformat()
 
 
@@ -24,5 +25,5 @@ class EchoTool:
     description = "Echo back the provided text."
     run_location = RunLocation.ANY
 
-    async def run(self, text: str = "", **kwargs) -> str:
+    async def run(self, text: str = "", **kwargs: Any) -> str:
         return text

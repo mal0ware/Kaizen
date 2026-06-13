@@ -58,7 +58,7 @@ class LocalProvider:
 
         messages, tools = to_ollama(request.messages, request.tools)
 
-        async def _post(payload: dict):
+        async def _post(payload: dict[str, object]) -> httpx.Response:
             async with httpx.AsyncClient(timeout=120) as client:
                 return await client.post(f"{self.endpoint}/api/chat", json=payload)
 

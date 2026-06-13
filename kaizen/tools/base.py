@@ -7,7 +7,12 @@ implementing this protocol, registered here.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
+
+# ``ToolRegistry.list`` shadows the ``list`` builtin inside the class body, so
+# annotating a method as ``-> list[Tool]`` would resolve ``list`` to the method.
+# Alias the builtin under a name that is never shadowed.
+ToolList = list
 
 
 class RunLocation(str, Enum):
@@ -29,7 +34,7 @@ class Tool(Protocol):
     description: str
     run_location: RunLocation
 
-    async def run(self, **kwargs) -> str: ...
+    async def run(self, **kwargs: Any) -> str: ...
 
 
 def run_location_of(tool: object) -> RunLocation:
@@ -47,10 +52,10 @@ class ToolRegistry:
     def get(self, name: str) -> Tool | None:
         return self._tools.get(name)
 
-    def list(self) -> list[Tool]:
+    def list(self) -> ToolList[Tool]:
         return list(self._tools.values())
 
-    def specs(self) -> list[dict]:
+    def specs(self) -> ToolList[dict[str, str]]:
         """Model-facing tool descriptions."""
         return [{"name": t.name, "description": t.description} for t in self._tools.values()]
 

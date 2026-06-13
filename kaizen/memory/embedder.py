@@ -27,4 +27,5 @@ class OllamaEmbedder:
                 f"{self.endpoint}/api/embeddings", json={"model": self.model, "prompt": text}
             )
             resp.raise_for_status()
-            return resp.json()["embedding"]
+            embedding: list[float] = resp.json()["embedding"]
+            return embedding

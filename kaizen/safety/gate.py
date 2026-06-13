@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from kaizen.curator.proposals import Proposal
+    from kaizen.curator.proposals import Proposal, ProposalStatus
 
 
 # Action kinds the gate currently considers privileged. Read-only / draft-only
@@ -58,7 +58,7 @@ class ApprovalGate:
     def requires_approval(self, action: str) -> bool:
         return action in _PRIVILEGED_ACTIONS
 
-    def _decide(self, proposal_id: str, target):  # type: ignore[no-untyped-def]
+    def _decide(self, proposal_id: str, target: ProposalStatus) -> Proposal:
         proposal = self._pending.pop(proposal_id, None)
         if proposal is None:
             if proposal_id in self._decided:

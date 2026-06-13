@@ -11,6 +11,10 @@ from enum import Enum
 
 from kaizen.core.models import _now
 
+# ``SkillRegistry.list`` shadows the ``list`` builtin in the class body; alias
+# it so ``-> list[Skill]`` annotations resolve to the builtin, not the method.
+_SkillList = list
+
 
 class SkillStatus(str, Enum):
     ACTIVE = "active"
@@ -39,10 +43,10 @@ class SkillRegistry:
     def get(self, name: str) -> Skill | None:
         return self._skills.get(name)
 
-    def list(self) -> list[Skill]:
+    def list(self) -> _SkillList[Skill]:
         return list(self._skills.values())
 
-    def specs(self) -> list[dict]:
+    def specs(self) -> _SkillList[dict[str, str]]:
         """Model-facing entries — only active skills."""
         return [
             {"name": s.name, "description": s.description}

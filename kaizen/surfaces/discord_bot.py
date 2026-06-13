@@ -27,7 +27,7 @@ import time
 
 import discord
 
-from kaizen.cli.main import build_agent
+from kaizen.cli.main import AgentBundle, build_agent
 from kaizen.config import load_settings
 from kaizen.core.models import Message, Role, Session
 from kaizen.curator.apply import apply_approval
@@ -38,7 +38,7 @@ def _chunks(text: str, limit: int = 1900) -> list[str]:
     return [text[i : i + limit] for i in range(0, len(text), limit)]
 
 
-def _format_proposals(bundle) -> str:
+def _format_proposals(bundle: AgentBundle) -> str:
     pending = bundle.queue.pending()
     if not pending:
         return "(no pending proposals)"
@@ -52,7 +52,7 @@ def _format_proposals(bundle) -> str:
     return "\n".join(lines)
 
 
-def _handle_dm_command(content: str, bundle) -> str | None:
+def _handle_dm_command(content: str, bundle: AgentBundle) -> str | None:
     """Return a reply string if ``content`` is a recognized command, else None."""
     cmd, _, arg = content.strip().partition(" ")
     if cmd == "!proposals":
@@ -102,7 +102,7 @@ def run() -> None:
         return resolved is not None and getattr(resolved, "author", None) == client.user
 
     @client.event
-    async def on_ready():
+    async def on_ready() -> None:
         memory = bundle.loop.context.memory
         init = getattr(memory, "init_db", None)
         if init is not None:
@@ -110,7 +110,7 @@ def run() -> None:
         print(f"Kaizen online as {client.user} (memory: {memory.name})")
 
     @client.event
-    async def on_message(message: discord.Message):
+    async def on_message(message: discord.Message) -> None:
         if message.author == client.user or message.author.bot:
             return
 

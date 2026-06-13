@@ -27,5 +27,7 @@ class Fact:
 
 @runtime_checkable
 class MemoryStore(Protocol):
+    name: str
+
     async def add_fact(self, fact: Fact) -> None: ...
     async def search(self, query: str, k: int = 5) -> list[Fact]: ...

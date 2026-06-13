@@ -8,14 +8,21 @@ be unit-tested without a key.
 """
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
 from kaizen.core.models import Message, Role, ToolCall
 from kaizen.providers.base import CompletionRequest, CompletionResponse, Tier
 
+if TYPE_CHECKING:
+    from anthropic import AsyncAnthropic
 
-def to_anthropic(messages: list[Message], tools: list[dict]) -> tuple[str, list[dict], list[dict]]:
+
+def to_anthropic(
+    messages: list[Message], tools: list[dict[str, Any]]
+) -> tuple[str, list[dict[str, Any]], list[dict[str, Any]]]:
     """Convert our messages/tools into (system_text, messages, tools) for the API."""
     system_parts: list[str] = []
-    out: list[dict] = []
+    out: list[dict[str, Any]] = []
 
     for m in messages:
         if m.role == Role.SYSTEM:
@@ -25,7 +32,7 @@ def to_anthropic(messages: list[Message], tools: list[dict]) -> tuple[str, list[
             out.append({"role": "user", "content": m.content})
         elif m.role == Role.ASSISTANT:
             if m.tool_calls:
-                blocks: list[dict] = []
+                blocks: list[dict[str, Any]] = []
                 if m.content:
                     blocks.append({"type": "text", "text": m.content})
                 for call in m.tool_calls:
@@ -62,9 +69,9 @@ class AnthropicProvider:
         self.tier = tier
         self.model = model
         self._api_key = api_key
-        self._client = None
+        self._client: AsyncAnthropic | None = None
 
-    def _client_or_create(self):
+    def _client_or_create(self) -> AsyncAnthropic:
         if self._client is None:
             from anthropic import AsyncAnthropic  # lazy optional dep
 
@@ -76,7 +83,11 @@ class AnthropicProvider:
         client = self._client_or_create()
         system, messages, tools = to_anthropic(request.messages, request.tools)
 
-        kwargs: dict = {"model": self.model, "max_tokens": request.max_tokens, "messages": messages}
+        kwargs: dict[str, Any] = {
+            "model": self.model,
+            "max_tokens": request.max_tokens,
+            "messages": messages,
+        }
         if system:
             kwargs["system"] = system
         if tools:
