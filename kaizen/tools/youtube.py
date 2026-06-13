@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+from typing import Any
 
 from kaizen.tools.base import RunLocation, TransientToolError
 
@@ -48,8 +49,12 @@ def classify_error(exc: Exception) -> str:
     return "unknown"
 
 
-def _fetch_segments(video_id: str):
-    """Swappable, isolated fetch — a library change touches only this function."""
+def _fetch_segments(video_id: str) -> Any:
+    """Swappable, isolated fetch — a library change touches only this function.
+
+    Returns the optional library's native segment objects (each with a ``.text``
+    attribute); typed ``Any`` because the dependency is lazy and version-fluid.
+    """
     from youtube_transcript_api import YouTubeTranscriptApi  # lazy, optional dep
 
     return YouTubeTranscriptApi().fetch(video_id)
@@ -64,7 +69,7 @@ class YouTubeTranscriptTool:
         # In-process cache; the real cache will live in the memory store (ADR 0002).
         self._cache: dict[str, str] = {}
 
-    async def run(self, url: str = "", **kwargs) -> str:
+    async def run(self, url: str = "", **kwargs: Any) -> str:
         video_id = extract_video_id(url)
         if not video_id:
             return "No YouTube video id found in the input."

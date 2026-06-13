@@ -7,12 +7,18 @@ add latency to the response.
 from __future__ import annotations
 
 import asyncio
+from typing import TYPE_CHECKING
 
 from kaizen.core.context import ContextEngine
 from kaizen.core.models import Message, Role, Session
 from kaizen.orchestration.router import Router, triage
 from kaizen.providers.base import CompletionRequest
 from kaizen.tools.base import ToolRegistry
+
+if TYPE_CHECKING:
+    from kaizen.curator.proposals import ProposalQueue
+    from kaizen.curator.review import Curator
+    from kaizen.memory.scribe import Scribe
 
 
 class AgentLoop:
@@ -21,11 +27,11 @@ class AgentLoop:
         router: Router,
         context: ContextEngine,
         tools: ToolRegistry,
-        scribe=None,
-        curator=None,
-        proposal_queue=None,
+        scribe: Scribe | None = None,
+        curator: Curator | None = None,
+        proposal_queue: ProposalQueue | None = None,
         max_tool_rounds: int = 3,
-    ):
+    ) -> None:
         self.router = router
         self.context = context
         self.tools = tools
@@ -52,7 +58,13 @@ class AgentLoop:
 
     async def _curate(self, session: Session) -> None:
         """Run the curator and push proposals into the queue. Swallows errors —
-        a failed curation pass must never break the conversation."""
+        a failed curation pass must never break the conversation.
+
+        Only scheduled by ``_maybe_curate`` after both are confirmed present;
+        the guard here re-establishes that for the type checker and is cheap.
+        """
+        if self.curator is None or self.proposal_queue is None:
+            return
         try:
             proposals = await self.curator.review(session)
             for proposal in proposals:

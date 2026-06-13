@@ -1,0 +1,32 @@
+# Disposable pgvector instance for the live memory integration test.
+#
+# Separate from docker-compose.box-a.yml (production) and the repo-root
+# docker-compose.yml (dev data plane, binds 5432) on purpose: this binds host
+# port 5433 so it never collides with an already-running Postgres, and it carries
+# no persistent named volume — `down -v` leaves nothing behind.
+#
+#   docker compose -f deploy/docker-compose.pgvector-test.yml up -d
+#   # ... run tests against KAIZEN_TEST_DATABASE_URL=...@127.0.0.1:5433/kaizen ...
+#   docker compose -f deploy/docker-compose.pgvector-test.yml down -v
+#
+# The scripts/pgvector-test.{sh,ps1} wrappers automate the whole cycle.
+
+name: kaizen-pgvector-test
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16  # Postgres 16 with pgvector preinstalled
+    container_name: kaizen-pgvector-test
+    environment:
+      POSTGRES_USER: kaizen
+      POSTGRES_PASSWORD: kaizen
+      POSTGRES_DB: kaizen
+    ports:
+      - "127.0.0.1:5433:5432"  # 5433 to avoid clashing with a 5432 Postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kaizen -d kaizen"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    tmpfs:
+      - /var/lib/postgresql/data  # ephemeral: fast, and wiped on container removal
