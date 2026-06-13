@@ -78,6 +78,31 @@ python -m kaizen
 
 This starts a terminal REPL backed by the mock provider. Type `/help` for in-session commands and `exit` to quit. To run against real models or persistent memory, copy `.env.example` to `.env` and fill in the relevant values.
 
+## Persistent memory (Postgres + pgvector)
+
+When `KAIZEN_DATABASE_URL` is set, the memory store switches from the in-memory fallback to the Postgres + `pgvector` backend: facts are embedded and persisted, and recall is a cosine-distance similarity search over the vectors. Embeddings are produced by one of two embedders, selected with `KAIZEN_EMBEDDER`:
+
+- `ollama` (default) — semantic embeddings from a local Ollama model (`nomic-embed-text`, 768-dim), free on the home GPU.
+- `hash` — a deterministic, dependency-free embedder (the hashing trick) that needs no model, GPU, or network. Its recall is bag-of-words rather than semantic, but it makes the persistent-memory path runnable and reproducible with zero external services. The integration test below uses it.
+
+### Live pgvector integration test
+
+A reproducible script stands up pgvector in Docker, enables the `vector` extension, and runs the end-to-end memory test (write facts → similarity search → ambient-scribe write path) against the live database:
+
+```bash
+pip install -e ".[db]"        # asyncpg, sqlalchemy, pgvector
+./scripts/pgvector-test.sh     # up -> migrate -> test -> down   (PowerShell: ./scripts/pgvector-test.ps1)
+```
+
+The script uses [`deploy/docker-compose.pgvector-test.yml`](deploy/docker-compose.pgvector-test.yml) (image `pgvector/pgvector:pg16`, host port `5433` so it never clashes with an existing Postgres, ephemeral storage). To point the suite at any other pgvector instance, set the URL yourself and run the marked tests directly:
+
+```bash
+KAIZEN_TEST_DATABASE_URL=postgresql+asyncpg://kaizen:kaizen@127.0.0.1:5433/kaizen \
+  python -m pytest tests/integration -v
+```
+
+The `tests/integration` suite is skipped automatically when `KAIZEN_TEST_DATABASE_URL` is unset, so the default offline suite runs with no infrastructure.
+
 ## Stack at a glance
 
 - Python orchestration; Rust/C++ for proven hot paths — see [ADR 0001](docs/decisions/0001-language-and-performance.md).
@@ -99,12 +124,12 @@ Get the Hetzner deployment and local models running as an MVP, then point Kaizen
 
 ## Status
 
-Runnable skeleton. The core subsystems are implemented and covered by 95 tests:
+Runnable skeleton. The core subsystems are implemented and covered by 108 offline tests, plus a live pgvector integration suite (111 total when a database is present):
 
 - **Agent loop** — context assembly, routed completion, tool rounds, and background scribe/curator passes.
 - **Tiered routing** — local / cheap / frontier tiers with per-message triage.
 - **Providers** — Anthropic API, Claude-CLI subprocess (subscription auth), local Ollama-compatible endpoint, and a deterministic mock for zero-key development.
-- **Memory** — in-memory store by default; Postgres + pgvector backend when configured.
+- **Memory** — in-memory store by default; Postgres + pgvector backend when configured, proven end to end against a live database by the integration suite (see [Persistent memory](#persistent-memory-postgres--pgvector)).
 - **Curator** — proposes learned traits and skills from conversation; every change is held in a queue behind an operator approval gate.
 - **Discord surface** — gateway bot sharing the same agent core as the CLI.
 - **Deploy scaffolding** — Docker Compose, systemd units, provisioning and backup scripts under [`deploy/`](deploy/).

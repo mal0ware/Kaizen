@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     local_model: str = "qwen2.5:7b"
 
     # Memory
+    embedder: str = "ollama"  # "ollama" (GPU, semantic) or "hash" (deterministic, offline, no deps)
     embed_model: str = "nomic-embed-text"  # Ollama embedding model (768-dim)
     vector_dim: int = 768
     enable_scribe: bool = True  # ambient learning: extract + store facts after each exchange
