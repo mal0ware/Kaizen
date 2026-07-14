@@ -33,4 +33,14 @@ Get the Hetzner deployment and local models running as an MVP, then point Kaizen
 
 ## Status
 
-Early. Foundation and design locked; implementation not yet started. Kaizen is a clean reimplementation inspired by existing agent harnesses — no third-party code is copied. License: TBD.
+Implemented and unit-tested; not yet deployed. ~2,700 lines of Python cover the agent loop, the provider layer (Anthropic API, Claude Code CLI, local/Ollama, mock), memory (in-memory + Postgres/pgvector), the curator/skills/safety/persona stack, and the CLI + Discord surfaces. The default test suite (95 tests) is mock-based and needs no infrastructure; `ruff` and `mypy` pass clean, and CI runs all three.
+
+First verified against real services on 2026-07-14 (local dev machine, `tests/test_live_infra.py` — opt-in via env vars):
+
+- **Postgres 16 + pgvector** (`docker compose up -d`): extension + schema creation, fact insert with 768-dim embeddings, cosine-distance semantic recall ordering.
+- **Redis 7**: connectivity round-trip. (Redis is config-only today — no code path consumes it yet.)
+- **Claude Code CLI provider**: one live completion through the local `claude` binary.
+
+Still mock-only / unexercised live: the raw Anthropic API provider (no key configured), the Ollama embedder and local-model tier (no Ollama server), the Discord surface against real Discord, and the Box A deployment scripts in `deploy/`.
+
+Kaizen is a clean reimplementation inspired by existing agent harnesses — no third-party code is copied. License: [MIT](LICENSE).
