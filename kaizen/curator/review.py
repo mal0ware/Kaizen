@@ -2,9 +2,14 @@
 
 A first-pass heuristic extractor runs locally and is fast; the real value comes
 from an LLM-backed extractor plugging into the same shape (provider call goes
-where :meth:`Curator._extract_from_message` is now). Clustering is intentionally
-trivial — group by shared trigger keywords. Real similarity (embedding-based)
-is a TODO; the surface is stable so the swap is local.
+where :meth:`Curator._extract_from_message` is now).
+
+Known limitation (deliberate, unresolved): clustering in :meth:`Curator.evolve`
+groups by shared trigger keywords only. The planned upgrade is embedding cosine
+similarity via the ``Embedder`` protocol (``kaizen.memory.embedder``), which
+requires making ``evolve`` async and injecting an embedder — deferred until the
+local embedding path (Ollama) is running in deployment. The surface is stable,
+so the swap stays local to ``_cluster_by_keyword_overlap``.
 """
 from __future__ import annotations
 
@@ -98,8 +103,8 @@ class Curator:
         """Cluster related high-confidence instincts into proposed skills.
 
         Trivial keyword-overlap clustering: two instincts share a cluster if
-        they share any trigger keyword. TODO: replace with embedding cosine
-        similarity once the local embedder is wired in.
+        they share any trigger keyword. Embedding-based similarity is the
+        planned replacement — see the module docstring for why it's deferred.
         """
         active = [i for i in instincts if i.status is InstinctStatus.ACTIVE]
         clusters = _cluster_by_keyword_overlap(active)
