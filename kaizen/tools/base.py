@@ -7,7 +7,7 @@ implementing this protocol, registered here.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Protocol, runtime_checkable
+from typing import List, Protocol, runtime_checkable
 
 
 class RunLocation(str, Enum):
@@ -47,10 +47,12 @@ class ToolRegistry:
     def get(self, name: str) -> Tool | None:
         return self._tools.get(name)
 
-    def list(self) -> list[Tool]:
+    # ``typing.List`` here because the ``list()`` method shadows the builtin
+    # ``list`` type within the class body.
+    def list(self) -> List[Tool]:
         return list(self._tools.values())
 
-    def specs(self) -> list[dict]:
+    def specs(self) -> List[dict]:
         """Model-facing tool descriptions."""
         return [{"name": t.name, "description": t.description} for t in self._tools.values()]
 

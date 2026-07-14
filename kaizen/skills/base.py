@@ -8,6 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from typing import List
 
 from kaizen.core.models import _now
 
@@ -39,10 +40,13 @@ class SkillRegistry:
     def get(self, name: str) -> Skill | None:
         return self._skills.get(name)
 
-    def list(self) -> list[Skill]:
+    # NOTE: ``List``/builtins aliasing — inside this class body the name
+    # ``list`` refers to the ``list()`` method below, so annotations must use
+    # ``typing.List`` to reach the builtin type.
+    def list(self) -> List[Skill]:
         return list(self._skills.values())
 
-    def specs(self) -> list[dict]:
+    def specs(self) -> List[dict]:
         """Model-facing entries — only active skills."""
         return [
             {"name": s.name, "description": s.description}
