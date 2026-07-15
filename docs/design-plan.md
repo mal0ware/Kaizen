@@ -22,7 +22,7 @@ A detailed, component-by-component plan: what each piece is, the method behind i
 
 **Method.** Each surface authenticates to the core, opens/attaches to a session, streams turns. Because sessions live in the core, a thread can hand off between surfaces (Discord → terminal) and concurrent surfaces share one understanding.
 
-**Structure.** `kaizen/surfaces/discord/` (a `discord.py` bot, own identity, shares Vixen's infra), `kaizen/surfaces/terminal/` (Rich for rendering, prompt_toolkit for input — the "pretty" Claude-Code-like CLI). Web later.
+**Structure (as built).** `kaizen/surfaces/discord_bot.py` (a `discord.py` bot, own identity, shares Vixen's infra) and `kaizen/cli/main.py` (a plain terminal REPL). Both attach to the daemon over HTTP when one is reachable and fall back to an embedded engine when not. The Rich/prompt_toolkit "pretty" CLI remains a planned upgrade, not something that exists. Web later.
 
 **Connects to.** The core's internal API only. Surfaces never touch models, memory, or tools directly.
 

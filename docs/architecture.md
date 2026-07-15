@@ -10,10 +10,10 @@ Kaizen is a single **headless core** — the reasoning engine, memory, and ident
 
 "Headless" means the core has **no UI of its own**. It runs as a long-lived service exposing an internal API; every way you talk to Kaizen is a thin client of that service.
 
-- **Core (headless):** agent loop, orchestration/router, memory, identity graph, skills, safety/gates. Always running (on Hetzner).
+- **Core (headless):** agent loop, orchestration/router, memory, identity graph, skills, safety/gates. Runs as a daemon — `python -m kaizen serve` — exposing the internal API over HTTP (FastAPI/uvicorn, `kaizen/service/`). Destined for Hetzner; runs anywhere Python runs.
 - **Surfaces (clients):**
-  - **Discord gateway** — always-on presence via `discord.py`. Its own bot identity, separate from Vixen but sharing infra.
-  - **Terminal UI** — a "pretty" CLI (Rich for rendering, prompt_toolkit for input), in the spirit of Claude Code. Runs on any machine, connects to the core.
+  - **Discord gateway** — always-on presence via `discord.py`. Its own bot identity, separate from Vixen but sharing infra. Attaches to the daemon when one is reachable; otherwise runs the engine embedded.
+  - **Terminal CLI** — a plain REPL (`python -m kaizen`). Same attach-or-embed behavior as Discord. (A richer TUI — Rich/prompt_toolkit — remains an aspiration, not something that exists.)
   - **Web pane** — later.
 
 Why this matters: the brain is one thing; the faces are swappable. It's what makes the next point possible.
@@ -25,7 +25,7 @@ A conversation is a **session object owned by the core**, not by any surface. An
 - You can move a thread from Discord to the terminal mid-conversation and Kaizen still knows what you're talking about.
 - Two live conversations on different surfaces share the same underlying understanding (same memory, same identity graph), even concurrently.
 
-Mechanism: sessions and turns persist in the core's store; surfaces send/receive turns over the internal API; the context engine merges per-session history with cross-session recall.
+Mechanism: sessions and turns persist in the core's store; surfaces send/receive turns over the internal API (`POST /sessions`, `POST /sessions/{id}/messages`); the context engine merges per-session history with cross-session recall. Today the store is the zero-infra file-backed state directory (JSON snapshots under `~/.kaizen/state`); the Postgres-backed store takes over when deployed.
 
 ## Memory
 
@@ -108,18 +108,24 @@ Resolved topology (see [ADR 0007](decisions/0007-compute-topology.md)): **always
 ```
 kaizen/
 ├── kaizen/                  # main Python package
-│   ├── core/                # agent loop, context engine, session mgmt
+│   ├── bootstrap.py         # build_agent: the one wiring path every surface shares
+│   ├── core/                # agent loop, context engine, domain models
 │   ├── orchestration/       # routing, cloud/local split, triage, budgets
-│   ├── providers/           # model adapters (Anthropic, local engines)
-│   ├── memory/              # structured + semantic + tiered store, scribe
+│   ├── providers/           # model adapters (Anthropic, Claude Code, Ollama, mock)
+│   ├── memory/              # structured + semantic store, scribe
+│   ├── state/               # file-backed self-state (traits/skills/proposals/sessions)
+│   ├── service/             # the headless core: ASGI app, session store, scheduler, HTTP client
 │   ├── identity/            # entity/account/belief graph, resolution
 │   ├── curator/             # gated self-improvement loop (proposals only)
-│   ├── skills/              # procedural skills
-│   ├── surfaces/            # discord gateway, terminal UI, (web)
-│   ├── integrations/        # external systems (e.g. Hermes trading ops)
-│   ├── safety/              # redaction, sanitization, approval gates
-│   └── cli/                 # terminal entry point
-├── native/                  # Rust/C++ hot-path modules (bindings) — when profiled
+│   ├── skills/              # procedural skills (SKILL.md loader + registry)
+│   ├── realtime/            # interjection governor
+│   ├── persona/             # identity prior, tone, learned traits
+│   ├── surfaces/            # discord gateway + engagement policy, (web later)
+│   ├── integrations/        # external systems (e.g. Hermes trading ops) — placeholder
+│   ├── safety/              # redaction, approval gate
+│   ├── tools/               # builtin tools (time, echo, YouTube transcripts)
+│   ├── world/               # world-awareness (ADR 0011) — placeholder
+│   └── cli/                 # terminal REPL entry point (client or embedded)
 ├── docs/
 │   ├── architecture.md
 │   ├── design-log.md
@@ -128,6 +134,8 @@ kaizen/
 │   └── research/            # upstream evaluation, notes
 └── tests/
 ```
+
+(No `native/` directory exists yet — Rust/C++ hot paths arrive only after profiling, per ADR 0001.)
 
 ## Language & performance
 
