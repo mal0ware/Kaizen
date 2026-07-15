@@ -29,6 +29,12 @@ class Settings(BaseSettings):
     discord_token: str | None = None
     active_window_seconds: int = 180  # after you address it, keep replying for this long
 
+    # Headless core service (`python -m kaizen serve`). Surfaces probe
+    # `service_url` and attach as HTTP clients when the daemon is up.
+    service_host: str = "127.0.0.1"
+    service_port: int = 8420
+    service_url: str = "http://127.0.0.1:8420"
+
     # Infra (empty = use in-memory store; set to use self-hosted/managed Postgres)
     database_url: str | None = None
     redis_url: str | None = None

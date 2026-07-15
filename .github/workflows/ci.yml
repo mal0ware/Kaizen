@@ -16,7 +16,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install
-        run: pip install -e ".[dev,db,local,discord,anthropic]"
+        run: pip install -e ".[dev,db,local,discord,anthropic,service]"
 
       - name: Ruff
         run: ruff check .

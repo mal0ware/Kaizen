@@ -2,7 +2,9 @@
 
 After producing a reply it kicks off the scribe and the curator (if configured)
 as background tasks, so ambient learning and persona-evolution proposals never
-add latency to the response.
+add latency to the response. Set ``background_cognition=False`` to await them
+inline instead — the headless service does this so every turn's learning is
+complete (and snapshot-able) before the reply goes out.
 """
 from __future__ import annotations
 
@@ -25,6 +27,7 @@ class AgentLoop:
         curator=None,
         proposal_queue=None,
         max_tool_rounds: int = 3,
+        background_cognition: bool = True,
     ):
         self.router = router
         self.context = context
@@ -33,6 +36,7 @@ class AgentLoop:
         self.curator = curator
         self.proposal_queue = proposal_queue
         self.max_tool_rounds = max_tool_rounds
+        self.background_cognition = background_cognition
 
     def _maybe_scribe(self, session: Session) -> None:
         if self.scribe is None:
@@ -59,6 +63,18 @@ class AgentLoop:
                 self.proposal_queue.add(proposal)
         except Exception:
             return
+
+    async def _after_turn(self, session: Session) -> None:
+        """Post-turn cognition: fire-and-forget by default, awaited inline
+        when ``background_cognition`` is off."""
+        if self.background_cognition:
+            self._maybe_scribe(session)
+            self._maybe_curate(session)
+            return
+        if self.scribe is not None:
+            await self.scribe.observe(session)
+        if self.curator is not None and self.proposal_queue is not None:
+            await self._curate(session)
 
     async def handle(self, session: Session, user_message: Message) -> Message:
         session.add(user_message)
@@ -98,13 +114,11 @@ class AgentLoop:
             assistant = session.add(
                 Message(role=Role.ASSISTANT, content=response.text, name=provider.name)
             )
-            self._maybe_scribe(session)
-            self._maybe_curate(session)
+            await self._after_turn(session)
             return assistant
 
         assistant = session.add(
             Message(role=Role.ASSISTANT, content="(stopped: tool-round limit)", name=provider.name)
         )
-        self._maybe_scribe(session)
-        self._maybe_curate(session)
+        await self._after_turn(session)
         return assistant
