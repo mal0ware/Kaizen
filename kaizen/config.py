@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     # A directory of JSON files — zero infra. Empty = in-memory (test default).
     state_dir: str = "~/.kaizen/state"
 
+    # Background cognition (daemon only; seconds, 0 disables a cadence).
+    # The per-turn scribe/curator passes run regardless — these are the
+    # periodic consolidation sweeps, including instinct -> skill graduation.
+    scribe_interval_seconds: float = 300
+    curator_interval_seconds: float = 600
+
     # Behavior
     system_prompt: str = "You are Kaizen, a personal, always-improving assistant."
     talkativeness: float = 0.5

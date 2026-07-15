@@ -29,6 +29,7 @@ Operator-only commands (DM the bot):
 from __future__ import annotations
 
 import time
+from collections import deque
 
 import discord
 
@@ -36,7 +37,9 @@ from kaizen.bootstrap import AgentBundle, build_agent
 from kaizen.config import load_settings
 from kaizen.core.models import Message, Role, Session
 from kaizen.curator.apply import apply_approval
+from kaizen.realtime.governor import GovernorConfig, InterjectionGovernor
 from kaizen.service.client import ServiceClient, connect
+from kaizen.surfaces.engagement import EngagementContext, should_engage
 
 
 def _chunks(text: str, limit: int = 1900) -> list[str]:
@@ -162,6 +165,10 @@ def run(service_url: str | None = None) -> None:
     sessions: dict[int, Session] = {}  # embedded mode: channel id -> Session
     session_ids: dict[int, str] = {}  # client mode: channel id -> service session id
     active: dict[tuple[int, int], float] = {}  # (channel_id, user_id) -> window expiry
+    # Rolling per-channel context for the interjection governor (ADR 0005):
+    # every message the bot can see, engaged with or not, bounded per channel.
+    recent_by_channel: dict[int, deque[Message]] = {}
+    governor = InterjectionGovernor(GovernorConfig(talkativeness=settings.talkativeness))
 
     intents = discord.Intents.default()
     intents.message_content = True  # privileged intent — enable it in the Developer Portal
@@ -202,7 +209,22 @@ def run(service_url: str | None = None) -> None:
         now = time.monotonic()
         in_active_window = active.get(key, 0.0) > now
 
-        if not (is_dm or mentioned or _is_reply_to_bot(message) or in_active_window):
+        recent = recent_by_channel.setdefault(message.channel.id, deque(maxlen=10))
+        incoming = Message(
+            role=Role.USER,
+            content=message.content,
+            author_id=str(message.author.id),
+            name=message.author.display_name,
+        )
+        ctx = EngagementContext(
+            is_dm=is_dm,
+            mentioned=mentioned,
+            is_reply_to_bot=_is_reply_to_bot(message),
+            in_active_window=in_active_window,
+        )
+        engage = should_engage(ctx, incoming, list(recent), governor)
+        recent.append(incoming)
+        if not engage:
             return
 
         content = message.content

@@ -32,6 +32,7 @@ from kaizen.service.schemas import (
     SkillOut,
     TraitsOut,
 )
+from kaizen.service.scheduler import Scheduler
 from kaizen.service.sessions import SessionStore
 
 
@@ -75,17 +76,28 @@ def create_app(
     # and the session snapshot below is never behind.
     bundle.loop.background_cognition = False
     sessions = SessionStore(bundle.state)
+    scheduler = Scheduler(
+        bundle,
+        sessions,
+        scribe_interval=settings.scribe_interval_seconds,
+        curator_interval=settings.curator_interval_seconds,
+    )
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         init = getattr(bundle.loop.context.memory, "init_db", None)
         if init is not None:
             await init()
-        yield
+        scheduler.start()
+        try:
+            yield
+        finally:
+            await scheduler.stop()
 
     app = FastAPI(title="kaizen", lifespan=lifespan)
     app.state.bundle = bundle
     app.state.sessions = sessions
+    app.state.scheduler = scheduler
 
     def _get_session(session_id: str) -> Session:
         session = sessions.get(session_id)

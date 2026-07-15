@@ -50,12 +50,24 @@ def parse_facts(text: str) -> list[Fact]:
 
 
 class Scribe:
-    def __init__(self, provider: Provider, memory: MemoryStore, min_new_user_msgs: int = 1):
+    def __init__(
+        self,
+        provider: Provider,
+        memory: MemoryStore,
+        min_new_user_msgs: int = 1,
+        max_seen: int = 4096,
+        max_sessions: int = 256,
+    ):
         self.provider = provider
         self.memory = memory
         self.min_new = min_new_user_msgs
+        self.max_seen = max_seen
+        self.max_sessions = max_sessions
+        # Both caches are bounded (dicts keep insertion order, so eviction is
+        # oldest-first): a long-lived daemon must not grow them forever. An
+        # evicted _seen key at worst re-stores a duplicate fact — harmless.
         self._watermark: dict[str, int] = {}
-        self._seen: set[tuple[str, str, str]] = set()
+        self._seen: dict[tuple[str, str, str], None] = {}
 
     async def observe(self, session: Session) -> None:
         """Extract facts from turns added since last time, and store new ones.
@@ -65,13 +77,19 @@ class Scribe:
             new = session.messages[start:]
             if sum(1 for m in new if m.role == Role.USER) < self.min_new:
                 return
+            # Re-insert so the most recently active session evicts last.
+            self._watermark.pop(session.id, None)
             self._watermark[session.id] = len(session.messages)
+            while len(self._watermark) > self.max_sessions:
+                self._watermark.pop(next(iter(self._watermark)))
 
             for fact in await self._extract(new):
                 key = (fact.subject, fact.attribute, fact.value)
                 if key in self._seen:
                     continue
-                self._seen.add(key)
+                self._seen[key] = None
+                while len(self._seen) > self.max_seen:
+                    self._seen.pop(next(iter(self._seen)))
                 await self.memory.add_fact(fact)
         except Exception:
             return
