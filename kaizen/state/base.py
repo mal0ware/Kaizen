@@ -1,0 +1,33 @@
+"""State-store interface — what Kaizen remembers about *itself* across restarts.
+
+Distinct from :class:`~kaizen.memory.base.MemoryStore` (facts about the user):
+this store holds the agent's own evolved state — approved learned traits,
+active instincts, graduated skills, the approval gate's pending queue, and
+session snapshots. Synchronous on purpose: every payload is small, and the
+callers (gate decisions, approval application) are already fast paths.
+"""
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from kaizen.core.models import Session
+    from kaizen.curator.instinct import Instinct
+    from kaizen.curator.proposals import Proposal
+    from kaizen.skills.base import Skill
+
+
+@runtime_checkable
+class StateStore(Protocol):
+    name: str
+
+    def load_traits(self) -> list[str]: ...
+    def save_traits(self, traits: list[str]) -> None: ...
+    def load_skills(self) -> list[Skill]: ...
+    def save_skills(self, skills: list[Skill]) -> None: ...
+    def load_instincts(self) -> list[Instinct]: ...
+    def save_instincts(self, instincts: list[Instinct]) -> None: ...
+    def load_pending(self) -> list[Proposal]: ...
+    def save_pending(self, proposals: list[Proposal]) -> None: ...
+    def load_sessions(self) -> list[Session]: ...
+    def save_sessions(self, sessions: list[Session]) -> None: ...

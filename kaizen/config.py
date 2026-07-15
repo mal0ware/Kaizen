@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     database_url: str | None = None
     redis_url: str | None = None
 
+    # Self-state persistence (traits, skills, instincts, proposals, sessions).
+    # A directory of JSON files — zero infra. Empty = in-memory (test default).
+    state_dir: str = "~/.kaizen/state"
+
     # Behavior
     system_prompt: str = "You are Kaizen, a personal, always-improving assistant."
     talkativeness: float = 0.5

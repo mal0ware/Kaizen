@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from kaizen.curator.proposals import Proposal
+    from kaizen.state.base import StateStore
 
 
 # Action kinds the gate currently considers privileged. Read-only / draft-only
@@ -28,15 +29,26 @@ _PRIVILEGED_ACTIONS = frozenset(
 
 
 class ApprovalGate:
-    """In-memory pending/approve/reject store. One process; persistence comes
-    later behind the same surface."""
+    """Pending/approve/reject store. Pass a :class:`StateStore` and the
+    pending queue survives restarts — the gate rehydrates from it on
+    construction and snapshots after every submit/decision. Without one it
+    stays purely in-process (the test default)."""
 
-    def __init__(self) -> None:
+    def __init__(self, state: StateStore | None = None) -> None:
         self._pending: dict[str, Proposal] = {}
         self._decided: dict[str, Proposal] = {}
+        self._state = state
+        if state is not None:
+            for proposal in state.load_pending():
+                self._pending[proposal.id] = proposal
+
+    def _snapshot(self) -> None:
+        if self._state is not None:
+            self._state.save_pending(list(self._pending.values()))
 
     def submit(self, proposal: Proposal) -> str:
         self._pending[proposal.id] = proposal
+        self._snapshot()
         return proposal.id
 
     def pending(self) -> list[Proposal]:
@@ -66,4 +78,5 @@ class ApprovalGate:
             raise KeyError(f"unknown proposal: {proposal_id}")
         proposal.status = target
         self._decided[proposal_id] = proposal
+        self._snapshot()
         return proposal

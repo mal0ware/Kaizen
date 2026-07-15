@@ -69,6 +69,14 @@ class ProposalQueue:
         self._proposals: dict[str, Proposal] = {}
         self._gate = gate
         self._by_fingerprint: dict[tuple, str] = {}
+        # A persistence-backed gate may already hold pending proposals from a
+        # previous run — adopt them so listing and dedup see the same state.
+        if gate is not None:
+            for proposal in gate.pending():
+                self._proposals[proposal.id] = proposal
+                fp = _fingerprint(proposal)
+                if fp is not None:
+                    self._by_fingerprint[fp] = proposal.id
 
     def add(self, proposal: Proposal) -> str:
         fp = _fingerprint(proposal)

@@ -17,79 +17,12 @@ In-session commands:
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
 
-from kaizen.config import Settings, load_settings
-from kaizen.core.context import ContextEngine
-from kaizen.core.loop import AgentLoop
-from kaizen.core.models import Message, Role, Session
-from kaizen.curator import Curator, ProposalQueue
+from kaizen.bootstrap import AgentBundle, build_agent
+from kaizen.core.models import Message, Role
 from kaizen.curator.apply import apply_approval
-from kaizen.memory.factory import build_memory
-from kaizen.memory.inmemory import InMemoryStore
-from kaizen.memory.scribe import Scribe
-from kaizen.providers.base import Tier
-from kaizen.providers.factory import build_router
-from kaizen.providers.mock import MockProvider
-from kaizen.safety import ApprovalGate
-from kaizen.skills import SkillRegistry, load_skills_dir
-from kaizen.tools.base import ToolRegistry
-from kaizen.tools.builtin import CurrentTimeTool, EchoTool
 
-
-@dataclass(slots=True)
-class AgentBundle:
-    """Everything the CLI / surfaces need handles on. Built once at startup."""
-
-    loop: AgentLoop
-    session: Session
-    gate: ApprovalGate
-    queue: ProposalQueue
-    skills: SkillRegistry
-    learned_traits: list[str]
-
-
-def build_agent(settings: Settings | None = None) -> AgentBundle:
-    settings = settings or load_settings()
-
-    memory = build_memory(settings, InMemoryStore())
-    tools = ToolRegistry()
-    tools.register(CurrentTimeTool())
-    tools.register(EchoTool())
-
-    router = build_router(settings, MockProvider())
-    scribe = Scribe(router.providers[Tier.LOCAL], memory) if settings.enable_scribe else None
-
-    # Persona + curator wiring (ADR 0014). `learned_traits` is shared by
-    # reference: when the operator approves an instinct proposal, the
-    # apply-handler appends to this list and the next prompt picks it up.
-    learned_traits: list[str] = []
-    skills = SkillRegistry()
-    # Seed with the bundled example skills if present (active by default).
-    try:
-        from pathlib import Path
-
-        examples = Path(__file__).resolve().parent.parent / "skills" / "examples"
-        for skill in load_skills_dir(examples):
-            skills.register(skill)
-    except Exception:
-        pass
-
-    gate = ApprovalGate()
-    queue = ProposalQueue(gate=gate)
-    curator = Curator()
-
-    context = ContextEngine(memory, learned_traits=learned_traits)
-
-    loop = AgentLoop(router, context, tools, scribe=scribe, curator=curator, proposal_queue=queue)
-    return AgentBundle(
-        loop=loop,
-        session=Session(surface="cli"),
-        gate=gate,
-        queue=queue,
-        skills=skills,
-        learned_traits=learned_traits,
-    )
+__all__ = ["AgentBundle", "build_agent", "run"]
 
 
 async def _maybe_init(memory: object) -> None:
@@ -125,7 +58,13 @@ def _handle_command(line: str, bundle: AgentBundle) -> bool:
             return True
         if cmd == "/approve":
             bundle.queue.approve(match.id)
-            note = apply_approval(match, bundle.learned_traits, bundle.skills)
+            note = apply_approval(
+                match,
+                bundle.learned_traits,
+                bundle.skills,
+                state=bundle.state,
+                instincts=bundle.instincts,
+            )
             print(f"{note}\n")
         else:
             bundle.queue.reject(match.id)

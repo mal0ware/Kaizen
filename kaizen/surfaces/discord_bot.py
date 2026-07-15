@@ -27,7 +27,7 @@ import time
 
 import discord
 
-from kaizen.cli.main import build_agent
+from kaizen.bootstrap import build_agent
 from kaizen.config import load_settings
 from kaizen.core.models import Message, Role, Session
 from kaizen.curator.apply import apply_approval
@@ -68,7 +68,13 @@ def _handle_dm_command(content: str, bundle) -> str | None:
             return f"no pending proposal matches `{arg.strip()}`"
         if cmd == "!approve":
             bundle.queue.approve(match.id)
-            return apply_approval(match, bundle.learned_traits, bundle.skills)
+            return apply_approval(
+                match,
+                bundle.learned_traits,
+                bundle.skills,
+                state=bundle.state,
+                instincts=bundle.instincts,
+            )
         bundle.queue.reject(match.id)
         return f"rejected `{match.id[:8]}`"
     if cmd == "!traits":
