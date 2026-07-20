@@ -56,7 +56,7 @@ In the DigitalOcean console: **Create -> Droplets ->**
 
 ```bash
 ssh root@<droplet-ip>
-curl -fsSL https://raw.githubusercontent.com/mal0ware/Kaizen/feat/box-a-deploy/deploy/provision.sh -o provision.sh
+curl -fsSL https://raw.githubusercontent.com/mal0ware/Kaizen/master/deploy/provision.sh -o provision.sh
 bash provision.sh
 ```
 
@@ -93,7 +93,6 @@ git clone https://github.com/mal0ware/Kaizen.git
 git clone https://github.com/mal0ware/Vixen.git
 
 cd Kaizen
-git checkout feat/box-a-deploy        # until the branch is merged into master
 cd deploy
 
 cp .env.example .env

@@ -17,7 +17,7 @@ A personal, always-on, self-improving AI agent. One mind, many surfaces.
 - Python orchestration; Rust/C++ for proven hot paths — see [ADR 0001](docs/decisions/0001-language-and-performance.md).
 - Postgres + `pgvector` (structured + semantic memory) and Redis (hot state) — same stack as Vixen.
 - `discord.py` gateway; plain terminal REPL; FastAPI/uvicorn service layer with `httpx` clients.
-- Deploys on **Hetzner**. Local-model GPU placement is an open decision — see [architecture](docs/architecture.md#deployment).
+- Deploys on a **DigitalOcean** Droplet ("Box A") — see the [deploy kit](deploy/) and [runbook](deploy/runbook.md). Local-model GPU placement is an open decision — see [architecture](docs/architecture.md#deployment).
 
 ## Running it
 
@@ -57,7 +57,7 @@ Discord DM).
 
 ## Vision
 
-Get the Hetzner deployment and local models running as an MVP, then point Kaizen at its own design problems — using this documentation as its working substrate — so it participates in designing itself. Continuous improvement, applied recursively.
+Get the Box A deployment and local models running as an MVP, then point Kaizen at its own design problems — using this documentation as its working substrate — so it participates in designing itself. Continuous improvement, applied recursively.
 
 ## Status
 

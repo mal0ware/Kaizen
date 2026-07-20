@@ -5,7 +5,7 @@
 # (Ubuntu 24.04 LTS, NYC region) as root, e.g.:
 #
 #   ssh root@<droplet-ip>
-#   curl -fsSL https://raw.githubusercontent.com/mal0ware/Kaizen/feat/box-a-deploy/deploy/provision.sh -o provision.sh
+#   curl -fsSL https://raw.githubusercontent.com/mal0ware/Kaizen/master/deploy/provision.sh -o provision.sh
 #   bash provision.sh
 #
 # What it does:
@@ -129,7 +129,6 @@ Next steps (run as ${NEW_USER}, not root):
   git clone https://github.com/mal0ware/Kaizen.git
   git clone https://github.com/mal0ware/Vixen.git
   cd Kaizen
-  git checkout feat/box-a-deploy         # until the branch is merged
   cd deploy
   cp .env.example .env
   \$EDITOR .env                          # fill in tokens + DB passwords
